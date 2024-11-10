@@ -23,7 +23,6 @@ def SodTubeEnergy(x):
     return E
 
 def zero(x):
-    zeroarray = np.empty_like(x)
     return np.zeros(len(x))
 
 def InitialDistribution(x, function):
@@ -34,6 +33,16 @@ def PolytropicPressure(rho, gamma):
 
 def PolytropicPressureEnergy(rho, v, E, gamma):
     return (gamma-1) * (E - 1/2 * rho * v * v) 
+
+def Flux(u):
+
+    P = PolytropicPressureEnergy(u[0], u[1], u[2], gamma)
+    F0 = (u[0][:]*u[1][:])
+    F1 = (u[0][:]*u[1][:]*u[1][:] + P[:])
+    F2 = (u[1][:] * ( u[2][:] + P[:] ))
+    
+    return F0, F1, F2
+  
     
 C = 0.1
 N = 2000
