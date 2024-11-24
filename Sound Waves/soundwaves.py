@@ -8,15 +8,49 @@ import math
 import matplotlib
 from scipy.integrate import odeint
 
-def zero(x):
-    one = np.empty_like(x)
-    for i in range(len(one)): one[i] = 0.05
-    return one
+def initial(x):
+    u = np.zeros_like(x)
+    f1 = 1
+    f2 = np.linspace(2, 5, 2)
+    for j in range(len(u)):
+        for f in range(len(f2)): 
+            if (0.25<x[j]<.55): u[j] = u[j] +  np.sin(2*np.pi*f1*(x[j]-1))*np.sin(2*np.pi*f2[f]*x[j])
+            else: u[j] = 0
+    #u = -np.arctan(x-2)
+    return 1+ 0.2 * u
 
-def Wave(x):
-    result = np.empty_like(x)
-    for i in range(len(x)): result[i] = 1 + 0.1 * np.sin(2*np.pi*x[i]) 
-    return result
+def PlotImage(axes, x, f, Time, energy):
+    styles = ["solid", "dashed", "dotted"]
+
+    axes[0].cla()
+    axes[1].cla()
+    
+    m = 0
+    for u in f:
+        axes[0].plot(x, u, linestyle= styles[m], color='black', label = str(m))
+        m = m + 1
+        
+    axes[0].set_xlabel('x')
+    axes[0].set_ylabel('f')
+    axes[0].set_xlim(x[0],x[-1])
+    axes[0].set_ylim(-0.1,1.1)
+    axes[0].legend()
+    axes[0].set_title(str(round(Time[-1],2)))
+
+    m = 0
+    for e in energy:
+        axes[1].plot(Time, e, linestyle= styles[m], color='black')
+        m = m + 1
+    axes[1].set_xlabel('wavelength')
+    axes[1].set_ylabel('fourier')
+    axes[1].set_xlim(0,5)
+    axes[1].set_ylim(0,25)
+    
+    plt.tight_layout()  # Ensure spacing between plots
+    plt.pause(0.25)  # Pause to view each figure
+        
+def zero(x):
+    return np.zeros(len(x))
 
 def InitialDistribution(x, function):
     return function(x)
@@ -24,69 +58,76 @@ def InitialDistribution(x, function):
 def PolytropicPressure(rho, gamma):
     return rho**gamma
 
+def PolytropicPressureEnergy(rho, v, E, gamma):
+    return (gamma-1) * (E - 1/2 * rho * v * v) 
+
+def Flux_Euler(u):
+    P = PolytropicPressure(u[0], gamma)
+    F0 = (u[1][:])
+    F1 = (u[1][:]*u[1][:]/u[0][:] + P[:])
+    return [F0, F1]
+
+def SourceNull(x, u):
+    return 0
+
+def Source(x,U):
+    source = []
+    for i in range(len(U)):
+        if( i == 0 ): source.append(np.zeros(len(x)))
+        if( i == 1 ): source.append(x)
+    return source
+
+def CalculateNextIteration(dx, dt, x,  U, Flux, Source):
+    Fluxes = Flux(U)        
+    next = []
+    source = Source(x,U)
+    for i in range(len(U)):
+        next.append(np.zeros_like(U[i]))
+        for j in range(1, len(U[0])-1):
+            next[i][j] = 1/2 * ( U[i][j+1] + U[i][j-1] ) - dt / ( 2 * dx ) * ( Fluxes[i][j+1]   -  Fluxes[i][j-1] ) + dt /2  * (source[i][j+1] + source[i][j-1]) 
+        next[i][0] = next[i][1]
+        next[i][-1] = next[i][-2]
+    for i in range(len(U)): U[i][:] = next[i][:]
+    
 C = 0.1
-N = 2000
+N = 1000
 xmin = 0
 xmax = 1
-dx = ( xmax - xmin ) / (N)
+dx = ( xmax - xmin ) / (N - 1)
 dt = C * dx
-gamma = 1.
-NIterationImage = 100
+gamma = 1.4
 
 T = 1
 NIterations = T/dt
-
-x = [i*dx for i in range(N)]
-x_gR = x[0]
-x_gL = x[-1]
-
-rho   = np.empty_like(x)
-p     = np.empty_like(x)  
-
-rho_n   = np.empty_like(x)
-p_n     = np.empty_like(x)
-
-v     = np.empty_like(x)
-P     = np.empty_like(x)
-F_rho = np.empty_like(x)
-F_p   = np.empty_like(x)
-
-rho = InitialDistribution(x , Wave)
-v   = InitialDistribution(x, zero)
-
-
+NIterationsImage = 20
 i = 0
-while i < NIterations:
-    
-    p[:] = v[:] * rho[:]
-    rho_gR = rho[0]; rho_gL = rho[-1]; p_gR = p[0]; p_gL = p[-1]
 
-    P = PolytropicPressure(rho, gamma)
-    F_rho[:] = rho[:]*v[:]
-    F_p[:] =  rho[:]*v[:]*v[:] + P[:]
-    F_rho_gR = F_rho[0]; F_rho_gL = F_rho[-1]; F_p_gR = F_p[0]; F_p_gL = F_p[-1]  
-    
-    for j in range(1, N-1):
-        rho_n[j] = 1/2 * ( rho[j+1] + rho[j-1] ) - dt / ( 2 * dx ) * ( F_rho[j+1] - F_rho[j-1] )
-        p_n[j]   = 1/2 * ( p[j+1]   + p[j-1]   ) - dt / ( 2 * dx ) * ( F_p[j+1]   - F_p[j-1]   )
-        
-    rho_n[0]  = 1/2 * ( rho[1] + rho_gL )  - dt / ( 2 * dx ) * ( F_rho[1] - F_rho_gL )
-    rho_n[-1] = 1/2 * ( rho_gR + rho[-2] ) - dt / ( 2 * dx ) * ( F_rho_gR - F_rho[-2] )
-    p_n[0] = 1/2 * ( p[1] + p_gL )  - dt / ( 2 * dx ) * ( F_p[1] - F_p_gL )
-    p_n[-1] = 1/2 * ( p_gR + p[-2] ) - dt / ( 2 * dx ) * ( F_p_gR - F_p[-2] )
-    
-    rho[:] = rho_n[:]
-    p[:]   = p_n[:]
-    v[:]   = p_n[:] / rho_n[:]
-    
+x = np.linspace(xmin, xmax, N)
+rho   = np.empty_like(x)
+p     = np.empty_like(x)
+v     = np.empty_like(x)
+
+particle = []
+Time   = []
+
+rho = InitialDistribution(x,initial)
+v   = InitialDistribution(x,zero)
+plt.plot(x,rho)
+plt.show()
+U = [rho,v]
+p[:] = v[:] * rho[:]
+
+k_values = np.fft.fftfreq(N, d=dx)[0:N//2] * 2 * np.pi 
+wavelenght = 2 * np.pi / k_values
+fourier = np.abs(np.fft.fft(rho)[0:N//2])
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+
+while i < NIterations:
+    CalculateNextIteration(dx, dt, x, U, Flux_Euler, Source)
+    if(i%NIterationsImage == 0):
+        particle.append(integrate.simpson(rho*x*x, x=x))
+        Time.append(i*dt)
+        fourier = np.abs(np.fft.fft(rho)[0:N//2])
+        PlotImage(axes, x, [U[0], v],  Time, [particle])
     i = i + 1
-    
-    if(i%NIterationImage==0):
-        plt.cla()
-        plt.xlim(0,1)
-        plt.ylim(-1,1.15)
-        plt.scatter(x, rho, color='black', linewidth=0.005)
-        #plt.scatter(x, PolytropicPressure(rho, gamma), color='red', linewidth=0.005)
-        plt.scatter(x, v,   color='red', linewidth=0.005)
-        plt.title(str(round(i*dt,3)))
-        plt.pause(0.001)

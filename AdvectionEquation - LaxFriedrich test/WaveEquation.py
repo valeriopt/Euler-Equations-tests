@@ -14,8 +14,14 @@ import time
 styles = ["solid", "dashed", "dotted"]
 
 def initial(x):
-    s = 0.1
-    return np.exp(-(x-1)*(x-1)/(s*s))
+    u = np.zeros_like(x)
+    f1 = 1
+    f2 = np.linspace(8, 20, 10)
+    for j in range(len(u)):
+        for f in range(len(f2)): 
+            if (1<x[j]<1.5): u[j] = u[j] +  np.sin(2*np.pi*f1*x[j])*np.sin(2*np.pi*f2[f]*x[j]); print(u[j])
+            else: u[j] = 0
+    return u/10
 
 def initial_s(x):
     s = np.zeros_like(x)
@@ -45,7 +51,7 @@ def PlotImage(axes, x, f, Time, energy):
     axes[0].set_xlabel('x')
     axes[0].set_ylabel('f')
     axes[0].set_xlim(x[0],x[-1])
-    axes[0].set_ylim(0,1.05)
+    axes[0].set_ylim(-1,1)
 
     m = 0
     for e in energy:
@@ -132,7 +138,7 @@ while i < NIterations[-1]:
         for k in range(n):  
             energy[k].append(np.log10(sum(u[k]*u[k])))
             fourier[k] = np.abs(np.fft.fft(u[k])[0:N//2])
-        PlotImage(axes, x, u, wavelenght, fourier)
+        PlotImage(axes, x, u, Time, energy)
     
     for k in range(n): 
         if( i%f**(n-k) ==0 ):
